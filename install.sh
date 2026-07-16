@@ -20,6 +20,7 @@ USING_EXISTING_CONTAINER="false"
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 info() { printf '%s\n' "$*"; }
 step() { printf '\n==> [%s] %s\n' "$1" "$2"; }
+lowercase() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
 
 setup_terminal_input() {
   [[ -r "$INPUT_DEVICE" ]] || die "This installer needs an interactive terminal for its prompts. Run it from a terminal, not from a non-interactive CI job."
@@ -64,7 +65,7 @@ prompt_yes_no() {
   local label="$1" default="$2" value
   while true; do
     value="$(prompt_default "$label (yes/no)" "$default")"
-    case "${value,,}" in yes|y) printf 'true'; return ;; no|n) printf 'false'; return ;; esac
+    case "$(lowercase "$value")" in yes|y) printf 'true'; return ;; no|n) printf 'false'; return ;; esac
     info "Please answer yes or no."
   done
 }
@@ -105,7 +106,7 @@ configure() {
   local mode
   while true; do
     mode="$(prompt_default 'Installation mode: [q]uick or [a]dvanced' 'q')"
-    case "${mode,,}" in quick|q) break ;; advanced|a) prompt_advanced; break ;; *) info 'Enter q or a.' ;; esac
+    case "$(lowercase "$mode")" in quick|q) break ;; advanced|a) prompt_advanced; break ;; *) info 'Enter q or a.' ;; esac
   done
   prompt_password
 }
@@ -115,7 +116,7 @@ check_existing_container() {
     local choice
     info "A container named '$CONTAINER_NAME' already exists. Its data will not be changed."
     choice="$(prompt_default 'Choose: use existing, create new, or cancel' 'use existing')"
-    case "${choice,,}" in
+    case "$(lowercase "$choice")" in
       'use existing'|use|u)
         USING_EXISTING_CONTAINER="true"
         return
