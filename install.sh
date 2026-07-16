@@ -104,8 +104,8 @@ prompt_advanced() {
 configure() {
   local mode
   while true; do
-    mode="$(prompt_default 'Installation mode: quick or advanced' 'quick')"
-    case "${mode,,}" in quick|q) break ;; advanced|a) prompt_advanced; break ;; *) info 'Enter quick or advanced.' ;; esac
+    mode="$(prompt_default 'Installation mode: [q]uick or [a]dvanced' 'q')"
+    case "${mode,,}" in quick|q) break ;; advanced|a) prompt_advanced; break ;; *) info 'Enter q or a.' ;; esac
   done
   prompt_password
 }
