@@ -169,12 +169,25 @@ start_database() {
     "$IMAGE" >/dev/null || die "Container startup failed. Inspect logs with: $ENGINE logs $CONTAINER_NAME"
 }
 
+database_is_ready() {
+  local logs health
+  if logs="$("$ENGINE" logs "$CONTAINER_NAME" 2>&1)"; then
+    grep -Fq 'DATABASE IS READY TO USE!' <<< "$logs" && return 0
+  fi
+  if health="$("$ENGINE" container inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$CONTAINER_NAME" 2>/dev/null)" && [[ "$health" == healthy ]]; then
+    info 'Container health check reports healthy.'
+    return 0
+  fi
+  return 1
+}
+
 wait_for_database() {
-  local elapsed=0
+  local elapsed=0 running
   info "Waiting for Oracle AI Database Free to become ready (up to ${READY_TIMEOUT}s) ..."
   while (( elapsed < READY_TIMEOUT )); do
-    "$ENGINE" logs "$CONTAINER_NAME" 2>&1 | grep -q 'DATABASE IS READY TO USE!' && return
-    "$ENGINE" container inspect -f '{{.State.Running}}' "$CONTAINER_NAME" 2>/dev/null | grep -qx true || {
+    database_is_ready && return
+    running="$("$ENGINE" container inspect -f '{{.State.Running}}' "$CONTAINER_NAME" 2>/dev/null || true)"
+    [[ "$running" == true ]] || {
       "$ENGINE" logs "$CONTAINER_NAME" >&2 || true
       die "Container stopped before the database became ready."
     }

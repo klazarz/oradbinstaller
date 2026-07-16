@@ -22,6 +22,15 @@ assert_false valid_password 'Abcdefgh'
 USING_EXISTING_CONTAINER=false
 assert_eq false "$USING_EXISTING_CONTAINER"
 
+mock_runtime() {
+  case "$1" in
+    logs) printf 'DATABASE IS READY TO USE!\n' ;;
+    container) printf 'healthy\n' ;;
+  esac
+}
+ENGINE=mock_runtime
+assert_true database_is_ready
+
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 cat > "$tmp/podman" <<'MOCK'
