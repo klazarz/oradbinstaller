@@ -14,9 +14,15 @@ CHARACTERSET="AL32UTF8"
 ENABLE_ARCHIVELOG="false"
 ENABLE_FORCE_LOGGING="false"
 ORACLE_PWD=""
+INPUT_DEVICE="${ORADB_INSTALLER_TTY:-/dev/tty}"
 
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 info() { printf '%s\n' "$*"; }
+step() { printf '\n==> [%s] %s\n' "$1" "$2"; }
+
+setup_terminal_input() {
+  [[ -r "$INPUT_DEVICE" ]] || die "This installer needs an interactive terminal for its prompts. Run it from a terminal, not from a non-interactive CI job."
+}
 
 detect_os() {
   case "$(uname -s)" in
@@ -48,7 +54,8 @@ choose_engine() {
 
 prompt_default() {
   local label="$1" default="$2" answer
-  read -r -p "$label [$default]: " answer
+  printf '%s [%s]: ' "$label" "$default" > "$INPUT_DEVICE"
+  IFS= read -r answer < "$INPUT_DEVICE" || die 'No response received. Installation cancelled.'
   printf '%s' "${answer:-$default}"
 }
 
@@ -70,8 +77,12 @@ valid_password() {
 prompt_password() {
   local first second
   while true; do
-    read -r -s -p "Database password (8+ characters, upper/lowercase and digit): " first; printf '\n'
-    read -r -s -p "Confirm database password: " second; printf '\n'
+    printf 'Database password (8+ characters, upper/lowercase and digit): ' > "$INPUT_DEVICE"
+    IFS= read -r -s first < "$INPUT_DEVICE" || die 'No password received. Installation cancelled.'
+    printf '\n' > "$INPUT_DEVICE"
+    printf 'Confirm database password: ' > "$INPUT_DEVICE"
+    IFS= read -r -s second < "$INPUT_DEVICE" || die 'No password confirmation received. Installation cancelled.'
+    printf '\n' > "$INPUT_DEVICE"
     [[ "$first" == "$second" ]] || { info "Passwords do not match."; continue; }
     valid_password "$first" || { info "Password must have 8+ characters, uppercase, lowercase, and a digit; spaces are not allowed."; continue; }
     ORACLE_PWD="$first"; return
@@ -133,6 +144,9 @@ wait_for_database() {
     }
     sleep 5
     ((elapsed += 5))
+    if (( elapsed > 0 && elapsed % 30 == 0 )); then
+      info "Still preparing the database (${elapsed}s elapsed) ..."
+    fi
   done
   "$ENGINE" logs "$CONTAINER_NAME" >&2 || true
   die "Timed out waiting for the database. Check logs with: $ENGINE logs $CONTAINER_NAME"
@@ -200,13 +214,20 @@ show_sqlcl_connection() {
 }
 
 main() {
+  setup_terminal_input
+  step '1/6' 'Checking your operating system and container runtime'
   detect_os
   choose_engine
+  step '2/6' 'Choosing database configuration'
   configure
+  step '3/6' 'Checking for an existing container and downloading Oracle AI Database Free'
   check_existing_container
   pull_image
+  step '4/6' 'Creating persistent storage and starting the database container'
   start_database
+  step '5/6' 'Waiting for the database to finish initial setup'
   wait_for_database
+  step '6/6' 'Checking optional native SQLcl'
   ensure_sqlcl
   show_sqlcl_connection
   info "Container '$CONTAINER_NAME' is running. Manage it with: $ENGINE logs -f $CONTAINER_NAME"

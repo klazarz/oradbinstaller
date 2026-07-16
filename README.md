@@ -22,6 +22,8 @@ The Windows command must be run in PowerShell, not Command Prompt. Review the sc
 curl -fsSL https://raw.githubusercontent.com/klazarz/oradbinstaller/main/install.sh
 ```
 
+The macOS/Linux installer reads its interactive answers directly from your terminal, so the curl command works correctly even though the script itself arrives through a pipe. It displays six progress stages and a periodic update while the initial database setup runs.
+
 ## What it does
 
 1. Detects macOS, Linux, or Windows and selects Podman if available, otherwise Docker.
