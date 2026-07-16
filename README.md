@@ -44,7 +44,7 @@ SQLcl prompts for the password, rather than putting it in shell history.
 
 - Install and start Podman or Docker before running the installer. On macOS, Podman may also require `podman machine init` and `podman machine start`.
 - The default `oracle-free-data` named volume preserves data when the container is stopped or recreated. Deleting that volume deletes the database data.
-- The installer will not replace an existing container with the selected name.
+- If the selected container name already exists, the installer lets you safely use/start it, choose a new name with a separate port and volume, or cancel. It never removes an existing database automatically. When reusing one, use the password set during its original creation.
 - If Oracle Container Registry requires authentication or licence acceptance in your environment, accept it and run `podman login container-registry.oracle.com` (or `docker login ...`) before retrying.
 - The container password is supplied to the container runtime at startup. Avoid sharing terminal history or process listings from the installation session.
 

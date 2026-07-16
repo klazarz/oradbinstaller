@@ -19,6 +19,8 @@ assert_true valid_password 'Abcdefg1'
 assert_false valid_password 'abcdefgh1'
 assert_false valid_password 'ABCDEFGH1'
 assert_false valid_password 'Abcdefgh'
+USING_EXISTING_CONTAINER=false
+assert_eq false "$USING_EXISTING_CONTAINER"
 
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT

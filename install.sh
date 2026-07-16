@@ -15,6 +15,7 @@ ENABLE_ARCHIVELOG="false"
 ENABLE_FORCE_LOGGING="false"
 ORACLE_PWD=""
 INPUT_DEVICE="${ORADB_INSTALLER_TTY:-/dev/tty}"
+USING_EXISTING_CONTAINER="false"
 
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 info() { printf '%s\n' "$*"; }
@@ -110,9 +111,44 @@ configure() {
 }
 
 check_existing_container() {
-  if "$ENGINE" container inspect "$CONTAINER_NAME" >/dev/null 2>&1; then
-    die "A container named '$CONTAINER_NAME' already exists. It was not changed. Choose another name in advanced mode or remove it yourself."
-  fi
+  while "$ENGINE" container inspect "$CONTAINER_NAME" >/dev/null 2>&1; do
+    local choice
+    info "A container named '$CONTAINER_NAME' already exists. Its data will not be changed."
+    choice="$(prompt_default 'Choose: use existing, create new, or cancel' 'use existing')"
+    case "${choice,,}" in
+      'use existing'|use|u)
+        USING_EXISTING_CONTAINER="true"
+        return
+        ;;
+      'create new'|new|n)
+        prompt_new_container
+        ;;
+      cancel|c|quit|q)
+        die 'Installation cancelled. The existing container was not changed.'
+        ;;
+      *) info 'Enter use existing, create new, or cancel.' ;;
+    esac
+  done
+}
+
+prompt_new_container() {
+  local value
+  info 'New database defaults use a separate name, listener port, and data volume.'
+  while true; do
+    value="$(prompt_default 'New container name' "${CONTAINER_NAME}-2")"
+    valid_identifier "$value" && { CONTAINER_NAME="$value"; break; }
+    info 'Use letters, digits, dots, underscores, or hyphens.'
+  done
+  while true; do
+    value="$(prompt_default 'New host listener port' "$((HOST_PORT + 1))")"
+    valid_port "$value" && { HOST_PORT="$value"; break; }
+    info 'Enter a port from 1 through 65535.'
+  done
+  while true; do
+    value="$(prompt_default 'New persistent volume name' "${VOLUME_NAME}-2")"
+    valid_identifier "$value" && { VOLUME_NAME="$value"; break; }
+    info 'Use letters, digits, dots, underscores, or hyphens.'
+  done
 }
 
 pull_image() {
@@ -220,11 +256,17 @@ main() {
   choose_engine
   step '2/6' 'Choosing database configuration'
   configure
-  step '3/6' 'Checking for an existing container and downloading Oracle AI Database Free'
+  step '3/6' 'Checking for an existing database container'
   check_existing_container
-  pull_image
-  step '4/6' 'Creating persistent storage and starting the database container'
-  start_database
+  if [[ "$USING_EXISTING_CONTAINER" == true ]]; then
+    step '4/6' 'Starting the existing database container'
+    info "Using existing container '$CONTAINER_NAME'. The password entered in this run does not change its existing database password."
+    "$ENGINE" container inspect -f '{{.State.Running}}' "$CONTAINER_NAME" 2>/dev/null | grep -qx true || "$ENGINE" start "$CONTAINER_NAME" >/dev/null || die "Could not start existing container '$CONTAINER_NAME'."
+  else
+    step '4/6' 'Downloading Oracle AI Database Free and creating persistent storage'
+    pull_image
+    start_database
+  fi
   step '5/6' 'Waiting for the database to finish initial setup'
   wait_for_database
   step '6/6' 'Checking optional native SQLcl'
