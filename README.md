@@ -10,6 +10,12 @@ macOS or Linux:
 curl -fsSL https://raw.githubusercontent.com/klazarz/oradbinstaller/main/install.sh | bash
 ```
 
+If you prefer to invoke the installer with zsh, this is also supported:
+
+```zsh
+curl -fsSL https://raw.githubusercontent.com/klazarz/oradbinstaller/main/install.sh | zsh
+```
+
 Windows PowerShell:
 
 ```powershell
@@ -65,5 +71,7 @@ podman volume rm oracle-free-data     # permanently deletes database data
 ```bash
 bash -n install.sh
 bash tests/install.sh
+zsh -n install.sh tests/install.zsh
+zsh tests/install.zsh
 pwsh -NoProfile -Command 'Invoke-Pester ./tests/install.Tests.ps1'
 ```

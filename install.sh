@@ -205,12 +205,8 @@ java_17_available() {
   local version major
   command -v java >/dev/null 2>&1 || return 1
   version="$(java -version 2>&1 | head -n 1)"
-  if [[ "$version" =~ \"([0-9]+)(\.[0-9]+)? ]]; then
-    major="${BASH_REMATCH[1]}"
-    [[ "$major" != 1 ]] && (( major >= 17 ))
-  else
-    return 1
-  fi
+  major="$(printf '%s\n' "$version" | sed -n 's/.*"\([0-9][0-9]*\)\(\.[0-9][0-9]*\)\{0,1\}.*/\1/p')"
+  [[ "$major" =~ ^[0-9]+$ && "$major" != 1 ]] && (( major >= 17 ))
 }
 
 add_sqlcl_to_path() {
