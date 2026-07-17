@@ -28,7 +28,6 @@ Describe 'Oracle Free Windows installer helpers' {
 
     It 'uses quick-mode defaults and asks only for the password' {
         Mock Read-YesNo { $false }
-        Mock Read-OraclePassword { 'Oracle2026' }
         $config = Get-InstallConfiguration
         $config.ContainerName | Should -Be 'oracle-free'
         $config.VolumeName | Should -Be 'oracle-free-data'
@@ -36,11 +35,11 @@ Describe 'Oracle Free Windows installer helpers' {
         $config.CharacterSet | Should -Be 'AL32UTF8'
         $config.ArchiveLog | Should -Be 'false'
         $config.ForceLogging | Should -Be 'false'
+        $config.Password | Should -BeNullOrEmpty
     }
 
     It 'uses advanced values when provided' {
         Mock Read-YesNo { $true }
-        Mock Read-OraclePassword { 'Oracle2026' }
         Mock Read-ValidDefault {
             param($Prompt, $Default)
             switch ($Prompt) { 'Container name' { 'my-free' } 'Data volume name' { 'my-free-data' } default { '1522' } }

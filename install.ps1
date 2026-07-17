@@ -86,7 +86,7 @@ function Get-InstallConfiguration {
     $advanced = Read-YesNo 'Use advanced installation options?' $false
     $config = [ordered]@{
         ContainerName = 'oracle-free'; VolumeName = 'oracle-free-data'; Port = '1521'
-        CharacterSet = 'AL32UTF8'; ArchiveLog = 'false'; ForceLogging = 'false'; Password = (Read-OraclePassword)
+        CharacterSet = 'AL32UTF8'; ArchiveLog = 'false'; ForceLogging = 'false'; Password = $null
     }
     if ($advanced) {
         $config.ContainerName = Read-ValidDefault 'Container name' $config.ContainerName ${function:Test-Name} 'Use letters, numbers, dot, underscore, or hyphen.'
@@ -97,6 +97,21 @@ function Get-InstallConfiguration {
         $config.ForceLogging = if (Read-YesNo 'Enable force logging?' $false) { 'true' } else { 'false' }
     }
     return $config
+}
+
+function Use-ExistingContainer([System.Collections.IDictionary]$Config) {
+    & $script:Runtime container inspect $Config.ContainerName *> $null
+    if ($LASTEXITCODE -ne 0) { return $false }
+    Write-Info "A container named '$($Config.ContainerName)' already exists. Its data and password will not be changed."
+    if (-not (Read-YesNo 'Use or start this existing database?' $true)) {
+        throw 'Installation cancelled. The existing container was not changed.'
+    }
+    $running = (& $script:Runtime container inspect -f '{{.State.Running}}' $Config.ContainerName 2>$null | Out-String).Trim()
+    if ($running -ne 'true') {
+        & $script:Runtime start $Config.ContainerName
+        if ($LASTEXITCODE -ne 0) { throw "Could not start existing container '$($Config.ContainerName)'." }
+    }
+    return $true
 }
 
 function Start-OracleFree([System.Collections.IDictionary]$Config) {
@@ -178,7 +193,11 @@ function Main {
     Assert-ContainerRuntime $script:Runtime
     Write-Info "Using $script:Runtime."
     $config = Get-InstallConfiguration
-    Start-OracleFree $config
+    $usingExisting = Use-ExistingContainer $config
+    if (-not $usingExisting) {
+        $config.Password = Read-OraclePassword
+        Start-OracleFree $config
+    }
     Wait-OracleFree $config
     $hasSqlcl = Handle-Sqlcl
     Write-Host ''

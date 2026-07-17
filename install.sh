@@ -108,7 +108,6 @@ configure() {
     mode="$(prompt_default 'Installation mode: [q]uick or [a]dvanced' 'q')"
     case "$(lowercase "$mode")" in quick|q) break ;; advanced|a) prompt_advanced; break ;; *) info 'Enter q or a.' ;; esac
   done
-  prompt_password
 }
 
 check_existing_container() {
@@ -277,6 +276,8 @@ main() {
     info "Using existing container '$CONTAINER_NAME'. The password entered in this run does not change its existing database password."
     "$ENGINE" container inspect -f '{{.State.Running}}' "$CONTAINER_NAME" 2>/dev/null | grep -qx true || "$ENGINE" start "$CONTAINER_NAME" >/dev/null || die "Could not start existing container '$CONTAINER_NAME'."
   else
+    info 'A new database will be created; choose its administrative password now.'
+    prompt_password
     step '4/6' 'Downloading Oracle AI Database Free and creating persistent storage'
     pull_image
     start_database
