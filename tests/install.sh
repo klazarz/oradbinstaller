@@ -27,10 +27,12 @@ mock_runtime() {
   case "$1" in
     logs) printf 'DATABASE IS READY TO USE!\n' ;;
     container) printf 'healthy\n' ;;
+    login) printf 'oracle@example.com\n' ;;
   esac
 }
 ENGINE=mock_runtime
 assert_true database_is_ready
+assert_true ensure_registry_login
 
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT

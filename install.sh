@@ -3,6 +3,7 @@
 set -euo pipefail
 
 IMAGE="${ORADB_IMAGE:-container-registry.oracle.com/database/free:latest}"
+REGISTRY="container-registry.oracle.com"
 SQLCL_ZIP_URL="${SQLCL_ZIP_URL:-https://download.oracle.com/otn_software/java/sqldeveloper/sqlcl-latest.zip}"
 READY_TIMEOUT="${ORADB_INSTALLER_READY_TIMEOUT:-900}"
 ENGINE=""
@@ -156,6 +157,31 @@ pull_image() {
   "$ENGINE" pull "$IMAGE" || die "Could not pull $IMAGE. If Oracle Container Registry requests authentication or license acceptance, complete it with '$ENGINE login container-registry.oracle.com' and retry."
 }
 
+ensure_registry_login() {
+  local email token
+  if "$ENGINE" login --get-login "$REGISTRY" >/dev/null 2>&1; then
+    info "Oracle Container Registry login found for $REGISTRY."
+    return
+  fi
+
+  info "No Oracle Container Registry login was found for $REGISTRY."
+  info "Create an Oracle Container Registry auth token at: https://container-registry.oracle.com/"
+  info 'Sign in there, create an auth token, then enter your Oracle account email and token below.'
+  while true; do
+    printf 'Oracle account email: ' > "$INPUT_DEVICE"
+    IFS= read -r email < "$INPUT_DEVICE" || die 'No email received. Installation cancelled.'
+    [[ -n "$email" ]] || { info 'Email cannot be empty.'; continue; }
+    printf 'Oracle Container Registry auth token: ' > "$INPUT_DEVICE"
+    IFS= read -r -s token < "$INPUT_DEVICE" || die 'No auth token received. Installation cancelled.'
+    printf '\n' > "$INPUT_DEVICE"
+    if printf '%s' "$token" | "$ENGINE" login --username "$email" --password-stdin "$REGISTRY"; then
+      info 'Oracle Container Registry login succeeded.'
+      return
+    fi
+    info 'Login failed. Verify the email and auth token, then try again.'
+  done
+}
+
 start_database() {
   "$ENGINE" volume inspect "$VOLUME_NAME" >/dev/null 2>&1 || "$ENGINE" volume create "$VOLUME_NAME" >/dev/null
   info "Starting $CONTAINER_NAME ..."
@@ -260,27 +286,29 @@ show_sqlcl_connection() {
 
 main() {
   setup_terminal_input
-  step '1/6' 'Checking your operating system and container runtime'
+  step '1/7' 'Checking your operating system and container runtime'
   detect_os
   choose_engine
-  step '2/6' 'Choosing database configuration'
+  step '2/7' 'Choosing database configuration'
   configure
-  step '3/6' 'Checking for an existing database container'
+  step '3/7' 'Checking for an existing database container'
   check_existing_container
   if [[ "$USING_EXISTING_CONTAINER" == true ]]; then
-    step '4/6' 'Starting the existing database container'
+    step '4/7' 'Starting the existing database container (registry login not needed)'
     info "Using existing container '$CONTAINER_NAME'. The password entered in this run does not change its existing database password."
     "$ENGINE" container inspect -f '{{.State.Running}}' "$CONTAINER_NAME" 2>/dev/null | grep -qx true || "$ENGINE" start "$CONTAINER_NAME" >/dev/null || die "Could not start existing container '$CONTAINER_NAME'."
   else
     info 'A new database will be created; choose its administrative password now.'
     prompt_password
-    step '4/6' 'Downloading Oracle AI Database Free and creating persistent storage'
+    step '4/7' 'Checking Oracle Container Registry authentication'
+    ensure_registry_login
+    step '5/7' 'Downloading Oracle AI Database Free and creating persistent storage'
     pull_image
     start_database
   fi
-  step '5/6' 'Waiting for the database to finish initial setup'
+  step '6/7' 'Waiting for the database to finish initial setup'
   wait_for_database
-  step '6/6' 'Checking optional native SQLcl'
+  step '7/7' 'Checking optional native SQLcl'
   ensure_sqlcl
   show_sqlcl_connection
   info "Container '$CONTAINER_NAME' is running. Manage it with: $ENGINE logs -f $CONTAINER_NAME"

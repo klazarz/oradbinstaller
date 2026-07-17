@@ -9,6 +9,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $script:Image = 'container-registry.oracle.com/database/free:latest'
+$script:Registry = 'container-registry.oracle.com'
 $script:Runtime = $null
 
 function Write-Info([string]$Message) { Write-Host "[oracle-free] $Message" }
@@ -126,6 +127,28 @@ function Start-OracleFree([System.Collections.IDictionary]$Config) {
     if ($LASTEXITCODE -ne 0) { throw 'The container could not be started. Review runtime output above.' }
 }
 
+function Ensure-OracleRegistryLogin {
+    & $script:Runtime login --get-login $script:Registry *> $null
+    if ($LASTEXITCODE -eq 0) {
+        Write-Info "Oracle Container Registry login found for $script:Registry."
+        return
+    }
+    Write-Info "No Oracle Container Registry login was found for $script:Registry."
+    Write-Host 'Create an Oracle Container Registry auth token at: https://container-registry.oracle.com/'
+    Write-Host 'Sign in there, create an auth token, then enter your Oracle account email and token below.'
+    while ($true) {
+        $email = (Read-Host 'Oracle account email').Trim()
+        if ([string]::IsNullOrWhiteSpace($email)) { Write-Host 'Email cannot be empty.' -ForegroundColor Yellow; continue }
+        $secureToken = Read-Host 'Oracle Container Registry auth token' -AsSecureString
+        $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureToken)
+        try { $token = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr) }
+        finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }
+        $token | & $script:Runtime login --username $email --password-stdin $script:Registry
+        if ($LASTEXITCODE -eq 0) { Write-Info 'Oracle Container Registry login succeeded.'; return }
+        Write-Host 'Login failed. Verify the email and auth token, then try again.' -ForegroundColor Yellow
+    }
+}
+
 function Wait-OracleFree([System.Collections.IDictionary]$Config) {
     Write-Info 'Waiting for Oracle Database Free to become ready (this can take several minutes)...'
     foreach ($attempt in 1..90) {
@@ -196,6 +219,7 @@ function Main {
     $usingExisting = Use-ExistingContainer $config
     if (-not $usingExisting) {
         $config.Password = Read-OraclePassword
+        Ensure-OracleRegistryLogin
         Start-OracleFree $config
     }
     Wait-OracleFree $config

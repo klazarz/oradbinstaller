@@ -35,8 +35,9 @@ The macOS/Linux installer reads its interactive answers directly from your termi
 1. Detects macOS, Linux, or Windows and selects Podman if available, otherwise Docker.
 2. If neither runtime is installed, shows a Podman installation path and exits without installing anything.
 3. Prompts for **quick** or **advanced** installation and checks for an existing database before requesting a password. Quick mode asks only for the administrative password when creating a new database. Advanced mode supplies defaults for the container name, listener port, named data volume, character set, archive logging, and force logging.
-4. Pulls `container-registry.oracle.com/database/free:latest`, creates a persistent named volume, launches the database, and waits until it is ready.
-5. Detects native SQLcl (`sql`). If it is missing, it offers to install it. SQLcl needs Java 17+; the installer does not install Java automatically.
+4. Checks the selected runtime for an Oracle Container Registry login before the first pull. If no login is available, it links to the registry token page and securely prompts for the Oracle account email and auth token.
+5. Pulls `container-registry.oracle.com/database/free:latest`, creates a persistent named volume, launches the database, and waits until it is ready.
+6. Detects native SQLcl (`sql`). If it is missing, it offers to install it. SQLcl needs Java 17+; the installer does not install Java automatically.
 
 Oracle AI Database Free uses the fixed services `FREE` and `FREEPDB1`. After a successful SQLcl check, the installer displays this password-safe command:
 
